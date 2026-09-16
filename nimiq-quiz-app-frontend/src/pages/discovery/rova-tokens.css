@@ -1,0 +1,22 @@
+/**
+ * ROVA page surface — imported once, by RovaLayout.vue.
+ *
+ * The ROVA brand tokens themselves now live on :root in ../../style.css
+ * (the rebrand covers the whole app, not just this page), so this file only
+ * applies them to the page wrapper.
+ *
+ * Breakpoints: 768px (1↔2 col, nav↔tab-bar switch) and 1120px (2↔3 col)
+ * cannot be stored as custom properties — @media can't reference them — so
+ * they are hardcoded in each component's @media rules. Those two literal
+ * values are documented here as their single source of truth.
+ */
+.rova-page {
+  background: var(--rova-bg);
+  color: var(--rova-ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}

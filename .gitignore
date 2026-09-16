@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+*.tsbuildinfo
+
+# Environment and secret material — never commit real values.
+# .env.example IS committed: it documents every required variable with no values in it.
+.env
+.env.local
+.env.*.local
+!.env.example
+.secrets/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Internal documentation and AI agent working notes.
+# This pattern has no leading slash, so it matches every .ai folder at any
+# depth, including the one inside the "Nimiq app" directory.
+.ai/
+
+# Internal product specification.
+nim.txt
+
+# Editor and OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

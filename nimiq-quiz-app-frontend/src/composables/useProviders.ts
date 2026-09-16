@@ -1,0 +1,212 @@
+/**
+ * useProviders — the proper way to access a Nimiq wallet, on any platform.
+ *
+ * Two backends, one shared surface (D050):
+ * - Nimiq Pay: `init()` from `@nimiq/mini-app-sdk` resolves with a fully-typed
+ *   `NimiqProvider` once Nimiq Pay injects it (or rejects on timeout). See
+ *   https://nimiq.dev/mini-apps/mini-app-tutorial. Ported from
+ *   nimiq-mini-app-demo (T001-T003 validated this against real Nimiq Pay).
+ * - Desktop/any other browser: nothing injects that provider, so we fall back
+ *   to the Nimiq Hub API (`@nimiq/hub-api`) — the same popup-based
+ *   connect/sign/pay flow every pre-Mini-App Nimiq dApp (wallet.nimiq.com
+ *   included) has used for years. It needs no Nimiq Pay wrapper at all.
+ *
+ * Both are wrapped behind the same `WalletAdapter` shape (`signIn`,
+ * `sendBasicTransactionWithData`) so callers (useSession.ts,
+ * ContestEditorPage.vue) never need to know which backend is live.
+ *
+ * `signIn(message)` is deliberately ONE call that both picks an account and
+ * signs, not two (D051). A real desktop test found that Nimiq Pay's
+ * `listAccounts()` + `sign()` sequence, when ported naively to Hub, breaks:
+ * Hub's `chooseAddress()` and `signMessage()` each open a real browser
+ * popup, and the login-challenge network round-trip that used to sit
+ * between "pick account" and "sign" consumes the click's user-activation
+ * token, so the second popup gets silently blocked ("Failed to open
+ * popup"). Hub's `signMessage()` already shows its own account picker when
+ * `signer` is omitted, so the fix is one popup total: fetch the challenge
+ * first (now address-agnostic server-side, D051), then a single
+ * `signIn(message)` call. The Nimiq Pay adapter follows the same shape for
+ * consistency, even though chaining isn't a popup risk there (its
+ * `listAccounts`/`sign` talk to an injected in-page provider, not a real
+ * browser popup).
+ *
+ * The Hub adapter normalizes `HubApi`'s calls (and its throw-on-cancel
+ * behavior) to match the shared shape, including hex-encoding Hub's raw
+ * `Uint8Array` signature output and reusing D048's broadcast path for
+ * Hub-signed transactions (Hub only signs client-side; it does not
+ * reliably relay to the network the way `sendBasicTransactionWithData`
+ * does inside Nimiq Pay).
+ *
+ * Ethereum: the injected `window.ethereum` is used directly via the standard
+ * EIP-1193 `request({ method, params })` interface. Not needed for
+ * Phase 1 (D041: NIM-only MVP), kept for parity with the demo in case a
+ * later phase needs it.
+ *
+ * Readiness/provider state lives in module scope so it is resolved exactly
+ * once and shared across the whole app.
+ */
+import { ref, readonly, type Ref } from 'vue'
+import { init, type NimiqProvider } from '@nimiq/mini-app-sdk'
+import HubApi from '@nimiq/hub-api'
+
+const NIMIQ_INIT_TIMEOUT = 10_000
+const HUB_URL = import.meta.env.VITE_NIMIQ_HUB_URL ?? 'https://hub.nimiq-testnet.com'
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+const HUB_APP_NAME = 'Nimiq Quiz'
+
+export type WalletMode = 'nimiq-pay' | 'hub'
+
+export interface SignInResult {
+  address: string
+  publicKey: string
+  signature: string
+}
+interface ErrorResponse {
+  error?: { message?: string }
+}
+
+export interface WalletAdapter {
+  /** Picks an account (if needed) and signs `message` in one step (D051). */
+  signIn(message: string): Promise<SignInResult | ErrorResponse>
+  sendBasicTransactionWithData(tx: { recipient: string; value: number; data: string }): Promise<string | ErrorResponse>
+}
+
+const walletMode = ref<WalletMode | null>(null)
+const nimiqReady = ref(false)
+const nimiqConnecting = ref(true)
+const nimiqError = ref<string | null>(null)
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function buildNimiqPayAdapter(provider: NimiqProvider): WalletAdapter {
+  return {
+    async signIn(message: string) {
+      const accounts = await provider.listAccounts()
+      if (!Array.isArray(accounts) || accounts.length === 0) {
+        const err = !Array.isArray(accounts) ? accounts.error?.message : null
+        return { error: { message: err ?? 'No Nimiq account available' } }
+      }
+      const address = accounts[0]
+      const signed = await provider.sign(message)
+      if (!('publicKey' in signed)) {
+        return { error: { message: signed.error?.message ?? 'Wallet declined to sign the login challenge' } }
+      }
+      return { address, publicKey: signed.publicKey, signature: signed.signature }
+    },
+    sendBasicTransactionWithData: (tx) => provider.sendBasicTransactionWithData(tx),
+  }
+}
+
+function buildHubAdapter(): WalletAdapter {
+  const hubApi = new HubApi(HUB_URL)
+
+  return {
+    async signIn(message: string) {
+      try {
+        // `signer` intentionally omitted: Hub shows its own account picker
+        // as part of this same popup, so this is one popup total, not two.
+        const signed = await hubApi.signMessage({ appName: HUB_APP_NAME, message })
+        return {
+          address: signed.signer,
+          publicKey: bytesToHex(signed.signerPublicKey),
+          signature: bytesToHex(signed.signature),
+        }
+      } catch (err: any) {
+        return { error: { message: err?.message ?? 'Wallet declined to sign the login challenge' } }
+      }
+    },
+    async sendBasicTransactionWithData(tx: { recipient: string; value: number; data: string }) {
+      try {
+        const signed = await hubApi.checkout({
+          appName: HUB_APP_NAME,
+          recipient: tx.recipient,
+          value: tx.value,
+          extraData: tx.data,
+        })
+        const res = await fetch(`${API_BASE}/api/blockchain/broadcast`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hex: signed.serializedTx }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          return { error: { message: body.error ?? 'Failed to broadcast the deposit transaction' } }
+        }
+        return body.hash as string
+      } catch (err: any) {
+        return { error: { message: err?.message ?? 'Wallet declined the deposit transaction' } }
+      }
+    },
+  }
+}
+
+const nimiqInit: Promise<WalletAdapter> = init({ timeout: NIMIQ_INIT_TIMEOUT })
+  .then((provider: NimiqProvider) => {
+    walletMode.value = 'nimiq-pay'
+    nimiqReady.value = true
+    return buildNimiqPayAdapter(provider)
+  })
+  .catch(() => {
+    // Not running inside Nimiq Pay's WebView (e.g. a desktop browser) — the
+    // Hub API needs no host app at all, so this is a graceful fallback, not
+    // an error (D050).
+    try {
+      const adapter = buildHubAdapter()
+      walletMode.value = 'hub'
+      nimiqReady.value = true
+      return adapter
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : ''
+      nimiqError.value = message || 'No Nimiq wallet connection available. Reload and try again.'
+      throw err
+    }
+  })
+  .finally(() => {
+    nimiqConnecting.value = false
+  })
+
+/** Await the resolved wallet adapter. Only rejects if both backends fail to initialize. */
+async function getWallet(): Promise<WalletAdapter> {
+  return nimiqInit
+}
+
+export interface MethodRunner {
+  loading: Ref<boolean>
+  output: Ref<any>
+  runMethod(name: string, fn: () => Promise<any>): Promise<any>
+}
+
+export function useMethodRunner(): MethodRunner {
+  const loading = ref(false)
+  const output = ref<any>(null)
+
+  async function runMethod(name: string, fn: () => Promise<any>) {
+    loading.value = true
+    output.value = { method: name, status: 'pending...' }
+    try {
+      const result = await fn()
+      output.value = { method: name, result }
+      return result
+    } catch (error: any) {
+      output.value = { method: name, error: error?.message || error }
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { loading, output, runMethod }
+}
+
+export function useProviders() {
+  return {
+    nimiqReady: readonly(nimiqReady),
+    nimiqConnecting: readonly(nimiqConnecting),
+    nimiqError: readonly(nimiqError),
+    walletMode: readonly(walletMode),
+    getWallet,
+  }
+}

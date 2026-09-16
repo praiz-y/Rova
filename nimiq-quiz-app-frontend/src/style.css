@@ -1,0 +1,93 @@
+/*
+ * ROVA brand tokens. This is the single source of truth for every color and
+ * radius in the app — the ROVA rebrand is done, so there is no longer a
+ * "neutral baseline" to replace.
+ *
+ * Two naming schemes are defined deliberately:
+ *   --rova-*  the canonical brand names, used by src/pages/discovery/
+ *   legacy    --bg / --surface / --text / --border / --accent / --error-*
+ *             aliased to the ROVA values so the older page CSS needed no
+ *             edits when the palette changed. Prefer --rova-* in new code.
+ *
+ * Light only: ROVA is a warm cream/navy/red palette with no dark variant,
+ * so there is deliberately no prefers-color-scheme block. `color-scheme` is
+ * pinned to `light` so form controls and scrollbars stay light too.
+ */
+:root {
+  /* Surfaces — warm cream page, white cards on top */
+  --rova-bg: #fbf5e9;
+  --rova-surface: #ffffff;
+  --rova-surface-alt: #f6eedd;
+  --rova-line: #e6dcc2;
+
+  /* Navy — primary brand color: wordmark, headings, primary buttons */
+  --rova-navy-900: #0f1b33;
+  --rova-navy-700: #16264a;
+  --rova-navy-600: #1d3060;
+
+  /* Red — accent: live indicators, urgent/primary card CTAs */
+  --rova-red-500: #e9483a;
+  --rova-red-600: #d23a2e;
+  --rova-red-bg: #fdeae7;
+  /* Text on a red fill. White, not --rova-on-navy: the warm cream loses
+     contrast against red. */
+  --rova-on-red: #ffffff;
+
+  /* Text */
+  --rova-ink: #1c1b17;
+  --rova-ink-muted: #6e6a5e;
+  --rova-on-navy: #f5f1e6;
+  /* Warnings (e.g. an underfunded deposit) are not errors — D049 keeps the
+     two distinct — so this is a warm amber rather than --rova-red-600. */
+  --rova-warning-text: #8a5a00;
+
+  /* Layout. Breakpoints (768px / 1120px) can't be stored as custom
+     properties — @media can't reference them — so they're hardcoded in
+     each component's @media rules; see src/pages/discovery/rova-tokens.css
+     for the documented source of truth for those two literal values. */
+  --rova-radius: 14px;
+  --rova-radius-sm: 8px;
+
+  /* Legacy aliases → ROVA. Kept so existing page/component CSS keeps
+     working verbatim; nothing new should use these names. */
+  --bg: var(--rova-bg);
+  --surface: var(--rova-surface);
+  --text: var(--rova-ink);
+  --text-muted: var(--rova-ink-muted);
+  --border: var(--rova-line);
+  --accent: var(--rova-navy-900);
+  --accent-text: var(--rova-on-navy);
+  --warning-text: var(--rova-warning-text);
+  --error-bg: var(--rova-red-bg);
+  --error-text: var(--rova-red-600);
+
+  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
