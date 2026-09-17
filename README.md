@@ -166,7 +166,7 @@ and the backend's `FRONTEND_ORIGIN` defaults to matching it.
 | Variable | Required | Default | Notes |
 | --- | --- | --- | --- |
 | `PORT` | No | `3001` | HTTP port |
-| `FRONTEND_ORIGIN` | No | `http://localhost:5176` | CORS origin |
+| `FRONTEND_ORIGIN` | No | `http://localhost:5176` | CORS allowlist. Comma-separated to accept several, e.g. the deployed frontend plus localhost |
 | `DATABASE_URL` | **Yes** | — | Postgres connection string |
 | `SESSION_JWT_SECRET` | **Yes** | — | Long random value for session JWTs |
 | `NIMIQ_DEPOSIT_ADDRESS` | For paid contests | — | Shared deposit and payout address |

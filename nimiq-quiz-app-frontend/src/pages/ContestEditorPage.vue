@@ -131,7 +131,13 @@ async function loadFunding() {
  * address/reference/amount instead of a demo placeholder.
  */
 async function sendDeposit() {
-  if (!funding.value?.depositAddress || !funding.value.reference || !funding.value.totalNim) return
+  if (!funding.value?.depositAddress || !funding.value.reference || !funding.value.totalNim) {
+    // TEMP diagnostic — remove once the desktop checkout hang is resolved. This
+    // used to return silently, so "click Pay and nothing happens" was
+    // indistinguishable from "the wallet never answered".
+    console.warn('[deposit] funding info not loaded yet, not sending:', funding.value)
+    return
+  }
   depositing.value = true
   fundingError.value = null
   fundingMessage.value = null
@@ -330,7 +336,7 @@ async function handleSave() {
 
 <template>
   <main class="page">
-    <h1>{{ contestId ? 'Edit Contest' : 'New Contest' }}</h1>
+    <h1 class="rova-page-title">{{ contestId ? 'Edit Contest' : 'New Contest' }}</h1>
 
     <p v-if="loading" class="placeholder">Loading…</p>
 
@@ -602,9 +608,7 @@ async function handleSave() {
 }
 
 h1 {
-  font-size: 1.5rem;
   margin-bottom: 1.5rem;
-  color: var(--rova-navy-900);
 }
 
 .placeholder {

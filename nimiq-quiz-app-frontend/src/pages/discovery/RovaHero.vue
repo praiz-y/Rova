@@ -51,7 +51,7 @@ defineProps<{
 
 h1 {
   font-size: clamp(2.75rem, 12vw, 4.5rem);
-  font-weight: 900;
+  font-weight: var(--rova-fw-bold);
   letter-spacing: -0.03em;
   color: var(--rova-navy-900);
   margin: 0;

@@ -40,6 +40,12 @@ defineProps<{
   color: var(--rova-navy-900);
 }
 
+/* Deliberately NOT .rova-skeleton, despite the shared @keyframes shape.
+   That primitive's gradient runs --rova-surface → --rova-surface-alt, which
+   is white-on-white against the pill this sits inside; this placeholder needs
+   --rova-line to be visible at all. It also carries no border or radius
+   because .pill already supplies both. Deduplicating the two would make this
+   one disappear. */
 .skeleton {
   width: 7.5rem;
   height: 1.1rem;

@@ -52,7 +52,51 @@ import HubApi from '@nimiq/hub-api'
 const NIMIQ_INIT_TIMEOUT = 10_000
 const HUB_URL = import.meta.env.VITE_NIMIQ_HUB_URL ?? 'https://hub.nimiq-testnet.com'
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
-const HUB_APP_NAME = 'Nimiq Quiz'
+const HUB_APP_NAME = 'ROVA'
+
+/**
+ * hub-api resolves only when the Hub popup replies from the exact origin it
+ * was constructed with: @nimiq/rpc's PostMessageRpcClient compares
+ * `message.origin` against `new URL(endpoint).origin` and returns early on a
+ * mismatch — before it ever inspects the payload (see its `_receive` and
+ * `_connect`). The request then neither resolves nor rejects, so a wrong
+ * VITE_NIMIQ_HUB_URL presents as an indefinite spinner with no error at all.
+ * This bound converts that silence into something the user can act on.
+ *
+ * The abandoned request is not cancelled; if it settles later the result is
+ * simply discarded, which is the safe outcome for a login or a payment.
+ */
+const HUB_REQUEST_TIMEOUT_MS =
+  Number.parseInt(import.meta.env.VITE_NIMIQ_HUB_TIMEOUT_MS ?? '', 10) || 120_000
+
+function withHubTimeout<T>(promise: Promise<T>, action: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `${action} did not respond within ${Math.round(HUB_REQUEST_TIMEOUT_MS / 1000)} seconds. ` +
+              'If the wallet window is still open, close it and try again.'
+          )
+        ),
+      HUB_REQUEST_TIMEOUT_MS
+    )
+  })
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer))
+}
+
+/**
+ * hub-api's errors carry a numeric `code` alongside the message — the only
+ * thing that distinguishes "the user cancelled" from "the Hub itself failed".
+ * Keeping just the message made those two indistinguishable in the header,
+ * and made the origin-mismatch hang above read like a flat refusal.
+ */
+function describeHubError(err: any, fallback: string): string {
+  const message = typeof err?.message === 'string' && err.message ? err.message : fallback
+  const code = err?.code
+  return code === undefined || code === null ? message : `${message} (code ${code})`
+}
 
 export type WalletMode = 'nimiq-pay' | 'hub'
 
@@ -102,29 +146,44 @@ function buildNimiqPayAdapter(provider: NimiqProvider): WalletAdapter {
 function buildHubAdapter(): WalletAdapter {
   const hubApi = new HubApi(HUB_URL)
 
+  // TEMP diagnostic — remove once the desktop checkout hang is resolved. If
+  // this never prints, the Hub adapter was never built (i.e. the page is
+  // still running Nimiq Pay's adapter, or init() hasn't settled yet).
+  console.info('[wallet] Hub adapter active:', HUB_URL)
+
   return {
     async signIn(message: string) {
       try {
         // `signer` intentionally omitted: Hub shows its own account picker
         // as part of this same popup, so this is one popup total, not two.
-        const signed = await hubApi.signMessage({ appName: HUB_APP_NAME, message })
+        const signed = await withHubTimeout(
+          hubApi.signMessage({ appName: HUB_APP_NAME, message }),
+          'Signing in with the Nimiq wallet'
+        )
         return {
           address: signed.signer,
           publicKey: bytesToHex(signed.signerPublicKey),
           signature: bytesToHex(signed.signature),
         }
       } catch (err: any) {
-        return { error: { message: err?.message ?? 'Wallet declined to sign the login challenge' } }
+        return { error: { message: describeHubError(err, 'Wallet declined to sign the login challenge') } }
       }
     },
     async sendBasicTransactionWithData(tx: { recipient: string; value: number; data: string }) {
+      // TEMP diagnostic — remove once the desktop checkout hang is resolved.
+      // If this prints and nothing follows, the Hub popup never replied.
+      console.info('[wallet] checkout →', { recipient: tx.recipient, value: tx.value, data: tx.data })
       try {
-        const signed = await hubApi.checkout({
-          appName: HUB_APP_NAME,
-          recipient: tx.recipient,
-          value: tx.value,
-          extraData: tx.data,
-        })
+        const signed = await withHubTimeout(
+          hubApi.checkout({
+            appName: HUB_APP_NAME,
+            recipient: tx.recipient,
+            value: tx.value,
+            extraData: tx.data,
+          }),
+          'The deposit transaction'
+        )
+        console.info('[wallet] checkout resolved, broadcasting')
         const res = await fetch(`${API_BASE}/api/blockchain/broadcast`, {
           method: 'POST',
           credentials: 'include',
@@ -137,7 +196,9 @@ function buildHubAdapter(): WalletAdapter {
         }
         return body.hash as string
       } catch (err: any) {
-        return { error: { message: err?.message ?? 'Wallet declined the deposit transaction' } }
+        // TEMP diagnostic — remove once the desktop checkout hang is resolved.
+        console.warn('[wallet] checkout failed:', err)
+        return { error: { message: describeHubError(err, 'Wallet declined the deposit transaction') } }
       }
     },
   }

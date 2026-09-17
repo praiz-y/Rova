@@ -67,7 +67,7 @@ function toggle(i: number) {
 .eyebrow {
   margin: 0 0 0.35rem;
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: var(--rova-fw-bold);
   letter-spacing: 0.06em;
   color: var(--rova-red-600);
 }

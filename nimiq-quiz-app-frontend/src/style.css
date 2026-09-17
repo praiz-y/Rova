@@ -13,12 +13,52 @@
  * so there is deliberately no prefers-color-scheme block. `color-scheme` is
  * pinned to `light` so form controls and scrollbars stay light too.
  */
+
+/*
+ * Space Grotesk (SIL Open Font License 1.1) — self-hosted, not loaded from
+ * Google's CDN, so the app has no third-party request on first paint and the
+ * contest pages keep their typeface if fonts.googleapis.com is unreachable.
+ * The licence ships next to the files as public/fonts/OFL.txt.
+ *
+ * 400/500/700 is the family's complete weight range — there is no 800 or 900
+ * to request. See `font-synthesis: none` on body for what happens to the few
+ * rules that still ask for heavier.
+ */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-700.woff2') format('woff2');
+}
+
 :root {
   /* Surfaces — warm cream page, white cards on top */
   --rova-bg: #fbf5e9;
   --rova-surface: #ffffff;
   --rova-surface-alt: #f6eedd;
   --rova-line: #e6dcc2;
+  /* --rova-bg at 82%: the sticky header once it can blur what scrolls under
+     it. Written as a literal rather than color-mix() so the value is defined
+     in every engine — see the @supports guard in AppHeader.vue for why an
+     engine that can't blur must not get this one. */
+  --rova-bg-translucent: rgba(251, 245, 233, 0.82);
 
   /* Navy — primary brand color: wordmark, headings, primary buttons */
   --rova-navy-900: #0f1b33;
@@ -33,13 +73,82 @@
      contrast against red. */
   --rova-on-red: #ffffff;
 
-  /* Text */
-  --rova-ink: #1c1b17;
-  --rova-ink-muted: #6e6a5e;
+  /* Text. Warmed toward the red end of the palette rather than left neutral.
+     Headings stay navy, so the secondary voice is the only place the warmth
+     can live — otherwise the page reads as monochrome blue on cream.
+     Both are checked against --rova-bg #fbf5e9: ink 15.7:1, ink-muted 5.4:1,
+     so the warmth costs no legibility (AA needs 4.5:1 for body text).
+     Neither is used on a navy fill — that is --rova-on-navy. */
+  --rova-ink: #221b14;
+  --rova-ink-muted: #7a5f4a;
   --rova-on-navy: #f5f1e6;
   /* Warnings (e.g. an underfunded deposit) are not errors — D049 keeps the
      two distinct — so this is a warm amber rather than --rova-red-600. */
   --rova-warning-text: #8a5a00;
+
+  /* ---- Typography ---------------------------------------------------- */
+  --rova-font-sans:
+    'Space Grotesk',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+
+  /* Type scale. The app previously carried 22 distinct font sizes; these 8
+     absorb all of them (the per-page mapping lands in the Phase D sweep).
+     --rova-fs-xl is the one that matters most — five different page-title
+     sizes collapse into it. */
+  --rova-fs-2xs: 0.68rem;
+  --rova-fs-xs: 0.75rem;
+  --rova-fs-sm: 0.85rem;
+  --rova-fs-base: 0.95rem;
+  --rova-fs-md: 1.1rem;
+  --rova-fs-lg: 1.35rem;
+  --rova-fs-xl: 1.6rem;
+  --rova-fs-2xl: clamp(2.75rem, 12vw, 4.5rem);
+
+  /* Space Grotesk ships 400/500/700 and nothing heavier, so 700 is the
+     ceiling. Don't reintroduce 800/900: with font-synthesis off they would
+     silently render as 700 anyway, which is worse than saying so. */
+  --rova-fw-regular: 400;
+  --rova-fw-medium: 500;
+  --rova-fw-bold: 700;
+
+  --rova-lh-tight: 1.1;
+  --rova-lh-snug: 1.3;
+  --rova-lh-normal: 1.5;
+
+  /* ---- Space --------------------------------------------------------- */
+  --rova-space-1: 0.25rem;
+  --rova-space-2: 0.5rem;
+  --rova-space-3: 0.75rem;
+  --rova-space-4: 1rem;
+  --rova-space-5: 1.5rem;
+  --rova-space-6: 2rem;
+  --rova-space-7: 3rem;
+
+  /* ---- Elevation -----------------------------------------------------
+     Cards are deliberately flat at rest — the ROVA look is borders, not
+     shadows. These three are for overlays, hover, and the red FAB only. */
+  --rova-shadow-raised: 0 2px 8px rgba(15, 27, 51, 0.06);
+  --rova-shadow-overlay: 0 8px 32px rgba(15, 27, 51, 0.18);
+  --rova-shadow-accent: 0 4px 10px rgba(233, 72, 58, 0.35);
+  /* Behind modals. Navy rather than black, so the dimmed page keeps its warm
+     cast instead of going grey. */
+  --rova-scrim: rgba(15, 27, 51, 0.45);
+
+  /* ---- Motion -------------------------------------------------------- */
+  --rova-dur-fast: 120ms;
+  --rova-dur-base: 200ms;
+  --rova-dur-slow: 320ms;
+  --rova-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --rova-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---- Stacking ------------------------------------------------------ */
+  --rova-z-header: 20;
+  --rova-z-tabbar: 30;
+  --rova-z-overlay: 100;
 
   /* Layout. Breakpoints (768px / 1120px) can't be stored as custom
      properties — @media can't reference them — so they're hardcoded in
@@ -61,7 +170,7 @@
   --error-bg: var(--rova-red-bg);
   --error-text: var(--rova-red-600);
 
-  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  font: 16px/1.5 var(--rova-font-sans);
   color-scheme: light;
   color: var(--text);
   background: var(--bg);
@@ -73,12 +182,83 @@
 
 body {
   margin: 0;
+  /* Space Grotesk has no 800/900. Without this the browser fakes them for
+     the few rules still asking (wordmark, hero) and the result reads as
+     blurry next to real 700. Off means "use the nearest real weight". */
+  font-synthesis: none;
+}
+
+/*
+ * The app previously had no focus styling at all, so keyboard users got the
+ * UA default — which is close to invisible on the navy and red fills.
+ */
+:focus-visible {
+  outline: 2px solid var(--rova-navy-900);
+  outline-offset: 2px;
+}
+
+/* On a navy or red fill a navy ring disappears. Anything opting in with
+   .rova-on-dark gets the cream ring instead. */
+.rova-on-dark :focus-visible,
+.rova-on-dark:focus-visible {
+  outline-color: var(--rova-on-navy);
+}
+
+/*
+ * Phases C–E introduce the app's first real motion. This guard has to exist
+ * before any of it lands, not after.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 #app {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
+}
+
+/*
+ * Mobile shell — fixes the tab bar by layout rather than by position:fixed.
+ *
+ * "Almost invisible until I scroll" is what a fixed bottom bar does when the
+ * engine's layout viewport extends under the browser's own bottom toolbar:
+ * bottom:0 resolves to the bottom of the *layout* viewport, which is behind
+ * that toolbar, so only the bar's top sliver shows. The
+ * interactive-widget=resizes-content hint in index.html asks engines to
+ * shrink the layout viewport instead, but in-app browsers don't all
+ * implement it.
+ *
+ * So on mobile the app becomes a fixed-height column: the page scrolls inside
+ * .app-view and the tab bar is simply the last item in the column. Its
+ * position now depends only on the shell's height, and 100dvh keeps that
+ * equal to the visible viewport — no fixed positioning involved, so there is
+ * nothing left for a browser toolbar to hide behind.
+ *
+ * Desktop keeps window scrolling and is untouched.
+ */
+@media (max-width: 767px) {
+  #app {
+    /* 100vh first as a fallback for engines without dvh; where dvh exists it
+       wins, and it tracks the browser chrome showing and hiding. */
+    height: 100vh;
+    height: 100dvh;
+    /* Neutralise the base rule's min-height. svh is by definition <= dvh, so
+       they should never conflict — but if they ever did, min-height would win
+       and push the tab bar off the bottom of the screen, which is the exact
+       bug this block exists to fix. Cheaper to rule it out than to rely on it. */
+    min-height: 0;
+    /* Scrolling moves into .app-view. The document must not scroll too, or
+       the shell could slide out from under the tab bar. */
+    overflow: hidden;
+  }
 }
 
 h1,

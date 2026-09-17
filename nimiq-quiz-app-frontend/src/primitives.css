@@ -1,0 +1,193 @@
+/*
+ * ROVA primitives — the shared building blocks.
+ *
+ * These exist because the same handful of patterns was hand-written in a dozen
+ * scoped <style> blocks: three byte-identical skeletons, ten near-identical
+ * card rules, buttons differing only in their hover state, five different page
+ * title sizes. Anything defined here is expressed in the tokens from
+ * ./style.css — no literal colours or sizes below.
+ *
+ * These classes are global, hence the rova- prefix, matching the token naming.
+ */
+
+/* ---- Surfaces -------------------------------------------------------- */
+
+.rova-card {
+  background: var(--rova-surface);
+  border: 1px solid var(--rova-line);
+  border-radius: var(--rova-radius);
+  padding: var(--rova-space-4);
+}
+
+/*
+ * Cards are flat at rest — the ROVA look is borders, not shadows. This is the
+ * exception, for cards that are genuinely clickable and should acknowledge the
+ * pointer. Hover only lifts a little; it is not an overlay.
+ */
+.rova-card--interactive {
+  transition:
+    border-color var(--rova-dur-base) var(--rova-ease-out),
+    box-shadow var(--rova-dur-base) var(--rova-ease-out),
+    transform var(--rova-dur-base) var(--rova-ease-out);
+}
+
+.rova-card--interactive:hover {
+  border-color: var(--rova-navy-900);
+  box-shadow: var(--rova-shadow-raised);
+  transform: translateY(-2px);
+}
+
+/* ---- Type ------------------------------------------------------------ */
+
+/*
+ * Pure type: no margin. The global `h1, h2, h3 { margin: 0 }` reset in
+ * style.css already handles the common case, and pages that want a different
+ * margin set it on their own `h1` element rule. Declaring `margin: 0` here
+ * would outrank that (a class beats an element selector), silently killing
+ * every page's heading spacing — so it is deliberately absent.
+ */
+.rova-page-title {
+  font-size: var(--rova-fs-xl);
+  font-weight: var(--rova-fw-bold);
+  line-height: var(--rova-lh-tight);
+  letter-spacing: -0.02em;
+  color: var(--rova-navy-900);
+}
+
+.rova-section-title {
+  font-size: var(--rova-fs-md);
+  font-weight: var(--rova-fw-bold);
+  line-height: var(--rova-lh-snug);
+  color: var(--rova-navy-900);
+}
+
+/*
+ * Sentence case, red, tracked out. This is the treatment already used
+ * consistently across src/pages/discovery/, kept as-is rather than
+ * "normalised" into the uppercase one below — they are two different things.
+ */
+.rova-eyebrow {
+  margin: 0;
+  font-size: var(--rova-fs-xs);
+  font-weight: var(--rova-fw-bold);
+  letter-spacing: 0.06em;
+  color: var(--rova-red-600);
+}
+
+/* Uppercase micro-labels: table headers, badges, field captions. */
+.rova-label {
+  font-size: var(--rova-fs-2xs);
+  font-weight: var(--rova-fw-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rova-ink-muted);
+}
+
+/* Digits that change on screen — timers, scores, NIM amounts — must not
+   reflow their container as they tick. */
+.rova-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Buttons --------------------------------------------------------- */
+
+.rova-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rova-space-2);
+  padding: 0.6rem 1.2rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--rova-fs-sm);
+  font-weight: var(--rova-fw-bold);
+  line-height: var(--rova-lh-snug);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--rova-dur-fast) var(--rova-ease-out),
+    border-color var(--rova-dur-fast) var(--rova-ease-out),
+    color var(--rova-dur-fast) var(--rova-ease-out);
+}
+
+.rova-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Navy: the ordinary primary action — form submits, "New Contest", connect. */
+.rova-btn--primary {
+  background: var(--rova-navy-900);
+  color: var(--rova-on-navy);
+}
+
+.rova-btn--primary:hover:not(:disabled) {
+  background: var(--rova-navy-700);
+}
+
+/*
+ * Red is reserved for live/urgent — entering a quiz that is running, the
+ * create FAB. Not a generic "important" button.
+ */
+.rova-btn--accent {
+  background: var(--rova-red-500);
+  color: var(--rova-on-red);
+  box-shadow: var(--rova-shadow-accent);
+}
+
+.rova-btn--accent:hover:not(:disabled) {
+  background: var(--rova-red-600);
+}
+
+.rova-btn--secondary {
+  background: transparent;
+  border-color: var(--rova-navy-900);
+  color: var(--rova-navy-900);
+}
+
+.rova-btn--secondary:hover:not(:disabled) {
+  background: var(--rova-surface-alt);
+}
+
+.rova-btn--ghost {
+  background: transparent;
+  color: var(--rova-ink-muted);
+}
+
+.rova-btn--ghost:hover:not(:disabled) {
+  background: var(--rova-surface-alt);
+  color: var(--rova-navy-900);
+}
+
+/* ---- Loading --------------------------------------------------------- */
+
+/*
+ * Replaces three byte-identical copies of this animation (AllContestsPage,
+ * RovaStatsRow, RovaContestSection). Each had its own @keyframes shimmer;
+ * Vue rewrites keyframe names per scoped block so they never actually
+ * collided, they were simply redundant.
+ *
+ * Under prefers-reduced-motion the global guard in style.css pins the
+ * duration, which leaves the gradient static — the intended fallback.
+ */
+.rova-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--rova-surface) 25%,
+    var(--rova-surface-alt) 50%,
+    var(--rova-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: rova-shimmer 1.4s infinite;
+  border: 1px solid var(--rova-line);
+  border-radius: var(--rova-radius);
+}
+
+@keyframes rova-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

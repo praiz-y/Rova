@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useContests, type PublicContest } from '../composables/useContests'
+import { useContests, type PublicContest, type LeaderboardEntry } from '../composables/useContests'
 import { useQuiz, type GameplayQuestion, type QuizAttempt } from '../composables/useQuiz'
 import { useSession } from '../composables/useSession'
 
 const route = useRoute()
 const router = useRouter()
-const { getPublic } = useContests()
+const { getPublic, getMyResult, getLeaderboard } = useContests()
 const { startAttempt, getCurrentQuestion, submitAnswer, submitQuiz } = useQuiz()
 const { user } = useSession()
 
@@ -23,6 +23,12 @@ const selectedOption = ref<number | null>(null)
 const shortAnswerInput = ref<string>('')
 const remainingSeconds = ref<number>(0)
 let timerInterval: ReturnType<typeof setInterval> | null = null
+
+// Result-view state. Loaded once the attempt is finalised — see the isFinished
+// watcher below.
+const myEntry = ref<LeaderboardEntry | null>(null)
+const submissionCount = ref(0)
+const resultsFinal = ref(false)
 
 const isFinished = computed(() => Boolean(attempt.value?.submittedAt))
 const currentQuestionNumber = computed(() => (attempt.value?.currentQuestionIndex ?? 0) + 1)
@@ -122,15 +128,27 @@ async function handleSubmitAnswer() {
     answerVal = shortAnswerInput.value.trim()
   }
 
+  // Captured before the await: submitAnswer replaces `attempt`, and
+  // currentQuestionNumber is derived from it.
+  const isLastQuestion = currentQuestionNumber.value >= totalQuestions.value
+
   submitting.value = true
   error.value = null
   try {
     const updatedAttempt = await submitAnswer(contestId.value, answerVal)
     attempt.value = updatedAttempt
 
-    // Check if more questions remain
     if (updatedAttempt.submittedAt) {
+      // The server finalised it for us — the timer expired mid-request.
       stopTimer()
+    } else if (isLastQuestion) {
+      // saveAnswer only increments current_question_index; it does not
+      // finalise. Without this call the index advances past the end of
+      // question_order and the participant lands on "Question 6 of 5" with
+      // nothing to answer. Their score and completion time are already
+      // recorded, so this only stamps submitted_at.
+      stopTimer()
+      attempt.value = await submitQuiz(contestId.value)
     } else {
       await loadNextQuestion()
     }
@@ -165,6 +183,81 @@ async function handleManualFinalSubmit() {
   }
 }
 
+/** 1 -> "1st". 11/12/13 are the exception to the mod-10 rule. */
+function ordinal(n: number): string {
+  const rem100 = n % 100
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`
+  switch (n % 10) {
+    case 1: return `${n}st`
+    case 2: return `${n}nd`
+    case 3: return `${n}rd`
+    default: return `${n}th`
+  }
+}
+
+function quizEndsAt(): number | null {
+  const current = contest.value
+  if (!current?.quizStartAt || !current?.quizDurationSeconds) return null
+  return new Date(current.quizStartAt).getTime() + current.quizDurationSeconds * 1000
+}
+
+/**
+ * Where the participant placed, and whether that number can still move.
+ *
+ * Both reads are needed and each answers a different half of the question:
+ * /results/mine is authoritative for *my* rank — the server computes it, so
+ * nothing is matched client-side — while the leaderboard supplies the field
+ * size, which my own entry cannot express ("3rd of 7" needs the 7).
+ *
+ * Best effort on purpose: this enhances a screen that already shows the score,
+ * so a failure here must leave the page working rather than surface an error
+ * over an otherwise correct result.
+ */
+async function loadResult() {
+  const endsAt = quizEndsAt()
+  // Sampled once. If the participant sits on this screen past the deadline the
+  // copy stays cautious ("so far") rather than claiming a finality that has
+  // since arrived — erring toward under-claiming.
+  resultsFinal.value = endsAt === null || Date.now() >= endsAt
+  try {
+    const [mine, board] = await Promise.all([
+      getMyResult(contestId.value),
+      getLeaderboard(contestId.value),
+    ])
+    myEntry.value = mine.entry
+    submissionCount.value = board.leaderboard?.length ?? 0
+  } catch {
+    myEntry.value = null
+  }
+}
+
+/**
+ * Fires on the transition into the finished state, which covers all three ways
+ * an attempt ends: answering the last question, submitting from the recovery
+ * button, and the timer expiring mid-question. A page reopened after the fact
+ * still transitions, because attempt starts null and so isFinished starts false.
+ */
+watch(isFinished, (finished) => {
+  if (finished) loadResult()
+})
+
+const rankText = computed(() => {
+  const entry = myEntry.value
+  if (!entry) return null
+  const of = submissionCount.value > 1 ? ` of ${submissionCount.value}` : ''
+  return resultsFinal.value
+    ? `You placed ${ordinal(entry.rank)}${of}.`
+    : `You're ${ordinal(entry.rank)}${of} so far.`
+})
+
+const rankNote = computed(() => {
+  if (!myEntry.value || resultsFinal.value) return null
+  const endsAt = quizEndsAt()
+  if (endsAt === null) return 'This can still change until the quiz closes.'
+  const closesAt = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' }).format(new Date(endsAt))
+  return `This can still change — the quiz closes at ${closesAt}.`
+})
+
 onMounted(initQuiz)
 onUnmounted(stopTimer)
 </script>
@@ -185,8 +278,14 @@ onUnmounted(stopTimer)
       <!-- Quiz Completed View -->
       <section v-if="isFinished" class="result-card">
         <div class="result-badge">Quiz Completed</div>
-        <h1>{{ contest.title }}</h1>
-        <p class="summary-text">Your submission has been recorded on the server.</p>
+        <h1 class="rova-page-title">{{ contest.title }}</h1>
+
+        <!-- Was "Your submission has been recorded on the server." — an
+             implementation detail, shown to the person who just played, in
+             place of the one thing they want to know. The fallback is plain
+             language rather than jargon, for when the rank is unavailable. -->
+        <p class="summary-text">{{ rankText ?? 'Your answers have been submitted.' }}</p>
+        <p v-if="rankNote" class="summary-note">{{ rankNote }}</p>
 
         <div class="stats-grid">
           <div class="stat-box">
@@ -196,6 +295,10 @@ onUnmounted(stopTimer)
           <div class="stat-box">
             <span class="stat-label">Completion Time</span>
             <span class="stat-value">{{ formatTime(attempt.completionSeconds ?? 0) }}</span>
+            <!-- The leaderboard orders by score DESC, completion_seconds ASC, so
+                 time decides your position whenever scores tie. Unlabelled it
+                 reads as a neutral stat. -->
+            <span class="stat-note">Used to break ties</span>
           </div>
         </div>
 
@@ -260,10 +363,15 @@ onUnmounted(stopTimer)
           </footer>
         </div>
 
+        <!-- Recovery path, not the normal one. Reached only when an attempt
+             has every question answered but was never finalised — i.e. the
+             participant closed the tab on the last question. The last-answer
+             path above now submits directly, so this exists to make that
+             attempt completable rather than stranded. -->
         <div v-else class="no-question">
-          <p>No questions available or quiz end reached.</p>
+          <p>You've answered every question.</p>
           <button class="btn primary" :disabled="submitting" @click="handleManualFinalSubmit">
-            Finish Quiz
+            {{ submitting ? 'Submitting…' : 'Submit Quiz' }}
           </button>
         </div>
       </section>
@@ -288,7 +396,7 @@ onUnmounted(stopTimer)
   border: 1px solid var(--rova-line);
   border-radius: var(--rova-radius);
   padding: 2rem;
-  box-shadow: 0 2px 12px rgba(15, 27, 51, 0.06);
+  box-shadow: var(--rova-shadow-raised);
 }
 
 .quiz-header {
@@ -346,7 +454,12 @@ onUnmounted(stopTimer)
   border: 1px solid var(--rova-line);
   border-radius: var(--rova-radius-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
+  /* Was `all`, which would also animate anything a later rule adds here —
+     including layout properties, at 60fps. Naming the two that actually
+     change keeps hover cheap and predictable. */
+  transition:
+    border-color var(--rova-dur-base) var(--rova-ease-out),
+    background-color var(--rova-dur-base) var(--rova-ease-out);
 }
 
 .option-item:hover {
@@ -424,6 +537,20 @@ onUnmounted(stopTimer)
   margin-bottom: 1rem;
 }
 
+/* Had no rule at all, so this line rendered as a bare UA paragraph. It now
+   carries the placement, which is the point of the screen. */
+.summary-text {
+  margin: 0;
+  font-weight: var(--rova-fw-medium);
+  color: var(--rova-ink);
+}
+
+.summary-note {
+  margin: 0.4rem 0 0;
+  font-size: var(--rova-fs-sm);
+  color: var(--rova-ink-muted);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -447,12 +574,20 @@ onUnmounted(stopTimer)
 
 .stat-value {
   font-size: 1.8rem;
-  font-weight: 800;
+  font-weight: var(--rova-fw-bold);
   color: var(--rova-navy-900);
 }
 
 .stat-value.highlight {
   color: var(--rova-red-600);
+}
+
+/* Tightened against the value it annotates: .stat-box spaces its children
+   evenly, which would float this note away from the time it belongs to. */
+.stat-note {
+  margin-top: -0.25rem;
+  font-size: var(--rova-fs-2xs);
+  color: var(--rova-ink-muted);
 }
 
 .actions {

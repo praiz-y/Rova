@@ -15,7 +15,7 @@ async function handleConnect() {
   try {
     await connect()
   } catch {
-    // error surfaced via useSession().error in RovaNav
+    // error surfaced via useSession().error in AppHeader
   }
 }
 </script>
@@ -24,7 +24,7 @@ async function handleConnect() {
   <footer class="rova-footer">
     <div class="footer-grid">
       <div class="brand-col">
-        <p class="brand-word">ROVA <span class="brand-tag">WIN</span></p>
+        <p class="brand-word">ROVA</p>
         <p class="tagline">Create. Compete. Win.</p>
         <p class="desc">A quiz-contest platform for the Nimiq ecosystem, paid in real NIM.</p>
       </div>
@@ -78,17 +78,8 @@ async function handleConnect() {
 .brand-word {
   margin: 0 0 0.3rem;
   font-size: 1.1rem;
-  font-weight: 900;
+  font-weight: var(--rova-fw-bold);
   color: var(--rova-navy-900);
-}
-
-.brand-tag {
-  font-size: 0.6rem;
-  font-weight: 800;
-  color: var(--rova-red-600);
-  background: var(--rova-red-bg);
-  border-radius: 999px;
-  padding: 0.1rem 0.35rem;
 }
 
 .tagline {
@@ -109,7 +100,7 @@ async function handleConnect() {
 .col-title {
   margin: 0 0 0.65rem;
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: var(--rova-fw-bold);
   letter-spacing: 0.06em;
   color: var(--rova-ink-muted);
 }

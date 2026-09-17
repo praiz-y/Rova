@@ -35,10 +35,15 @@ const steps = ['Create', 'Rules', 'Fund Prize', 'Publish', 'Compete']
   text-align: center;
 }
 
+/*
+ * .rova-eyebrow is red-600; this is red-500 deliberately. The section sits on
+ * navy, where red-600 (#d23a2e) is darker than the surface behind it and loses
+ * contrast. Do not "fix" this to match the other eyebrows.
+ */
 .eyebrow {
   margin: 0 0 0.4rem;
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: var(--rova-fw-bold);
   letter-spacing: 0.06em;
   color: var(--rova-red-500);
 }
@@ -48,6 +53,12 @@ h2 {
   font-size: 1.4rem;
 }
 
+/* Tints of --rova-on-navy (#f5f1e6) at 75/65/40%, for this component only.
+   Not color-mix(): an unsupported color-mix() drops the declaration and the
+   text would inherit navy on a navy background — invisible, and a far worse
+   failure than a slightly-off opacity. Four values here do not justify four
+   tokens. If these ever need to change with the palette, add
+   --rova-on-navy-* tokens rather than reaching for color-mix(). */
 .body {
   margin: 0 0 1.25rem;
   font-size: 0.9rem;
@@ -79,7 +90,7 @@ h2 {
   border-radius: 999px;
   padding: 0.75rem 1.6rem;
   background: var(--rova-red-500);
-  color: #fff;
+  color: var(--rova-on-red);
   text-decoration: none;
   font-weight: 700;
   font-size: 0.92rem;

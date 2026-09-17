@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useContests, type Contest } from '../composables/useContests'
 import { useSession } from '../composables/useSession'
+import ContestStatusBadge from '../components/ContestStatusBadge.vue'
+import ShareContestLink from '../components/ShareContestLink.vue'
+import { canShare } from '../composables/contestStatus'
 
 const { listMine, remove } = useContests()
 const { user } = useSession()
@@ -32,30 +35,70 @@ async function handleDelete(id: string) {
   }
 }
 
-onMounted(load)
+/**
+ * Wait for the session before asking for the list.
+ *
+ * App.vue restores the session in its own onMounted, which can resolve after
+ * this page has mounted. Loading on mount raced that, and when the session had
+ * not landed yet the page fell through to "Connect your wallet" instead of
+ * showing contests that were there all along. Watching also means the list
+ * appears the moment a reconnect completes, with no reload.
+ */
+watch(
+  user,
+  (current) => {
+    if (!current) {
+      contests.value = []
+      loading.value = false
+      return
+    }
+    load()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
   <main class="page">
     <div class="header-row">
-      <h1>My Contests</h1>
+      <h1 class="rova-page-title">My Contests</h1>
       <router-link to="/contests/new" class="new-button">+ New Contest</router-link>
     </div>
 
-    <p v-if="!user" class="placeholder">Connect your wallet to create and manage contests.</p>
-    <p v-else-if="loading" class="placeholder">Loading…</p>
+    <!-- error is checked before !user deliberately. A 401 from
+         /api/contests/mine clears the session (invalidateSession in
+         useContests.ts), and the old order fell through to "Connect your
+         wallet" — which hid the failure behind a message that looked like a
+         normal state. -->
+    <p v-if="loading" class="placeholder">Loading…</p>
     <p v-else-if="error" class="error-text">{{ error }}</p>
-    <p v-else-if="contests.length === 0" class="placeholder">
-      No contests yet. Create your first one.
-    </p>
+    <p v-else-if="!user" class="placeholder">Connect your wallet to create and manage contests.</p>
+
+    <div v-else-if="contests.length === 0" class="empty-state">
+      <p class="empty-title">No contests yet</p>
+      <p class="empty-hint">Create one to get a shareable link and a deposit address.</p>
+      <router-link to="/contests/new" class="new-button">+ New Contest</router-link>
+    </div>
 
     <ul v-else class="contest-list">
-      <li v-for="contest in contests" :key="contest.id" class="contest-row">
-        <router-link :to="`/contests/${contest.id}/edit`" class="contest-title">
-          {{ contest.title || '(untitled draft)' }}
-        </router-link>
-        <span class="status-badge">{{ contest.status }}</span>
-        <button class="delete-button" @click="handleDelete(contest.id)">Delete</button>
+      <li v-for="contest in contests" :key="contest.id" class="contest-card">
+        <div class="card-head">
+          <router-link :to="`/contests/${contest.id}/edit`" class="contest-title">
+            {{ contest.title || '(untitled draft)' }}
+          </router-link>
+          <ContestStatusBadge :status="contest.status" />
+        </div>
+
+        <div class="card-actions">
+          <router-link :to="`/contests/${contest.id}/edit`" class="ghost-btn">Edit</router-link>
+          <button class="danger-btn" @click="handleDelete(contest.id)">Delete</button>
+        </div>
+
+        <!-- Shares the public page, so it is absent while the contest is still
+             a draft or has been cancelled — see canShare. -->
+        <div v-if="canShare(contest.status)" class="card-share">
+          <ShareContestLink :contest-id="contest.id" :title="contest.title" />
+        </div>
       </li>
     </ul>
   </main>
@@ -72,12 +115,8 @@ onMounted(load)
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
   margin-bottom: 1.5rem;
-}
-
-h1 {
-  font-size: 1.5rem;
-  color: var(--rova-navy-900);
 }
 
 .new-button {
@@ -86,7 +125,7 @@ h1 {
   background: var(--rova-navy-900);
   color: var(--rova-on-navy);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: var(--rova-fw-bold);
   font-size: 0.88rem;
   white-space: nowrap;
 }
@@ -99,48 +138,113 @@ h1 {
   color: var(--rova-red-600);
 }
 
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: center;
+  padding: 2.5rem 1rem;
+  background: var(--rova-surface);
+  border: 1px dashed var(--rova-line);
+  border-radius: var(--rova-radius);
+}
+
+.empty-title {
+  margin: 0;
+  font-weight: var(--rova-fw-bold);
+  color: var(--rova-navy-900);
+}
+
+.empty-hint {
+  margin: 0 0 0.85rem;
+  font-size: var(--rova-fs-sm);
+  color: var(--rova-ink-muted);
+}
+
 .contest-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
-.contest-row {
+/* Was one flex row: title, raw status, Delete — with the title free to wrap
+   under the badges. Two rows instead, so the title always gets the full
+   measure and the actions sit in a predictable place. */
+.contest-card {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
   background: var(--rova-surface);
   border: 1px solid var(--rova-line);
   border-radius: var(--rova-radius);
+  transition: border-color var(--rova-dur-fast) var(--rova-ease-out);
+}
+
+.contest-card:hover {
+  border-color: var(--rova-navy-600);
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .contest-title {
-  flex: 1;
-  color: var(--rova-ink);
+  min-width: 0;
+  color: var(--rova-navy-900);
   text-decoration: none;
-  font-weight: 600;
+  font-weight: var(--rova-fw-bold);
+  line-height: var(--rova-lh-snug);
 }
 
-.status-badge {
-  font-size: 0.75rem;
-  color: var(--rova-ink-muted);
-  background: var(--rova-surface-alt);
-  padding: 0.2rem 0.6rem;
+.contest-title:hover {
+  text-decoration: underline;
+}
+
+/* The status pill and its tone classes now live in
+   components/ContestStatusBadge.vue, which the contest page renders too. */
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Separates "manage this contest" from "hand this contest to someone", which
+   are different kinds of action and were otherwise three undifferentiated rows
+   of controls. */
+.card-share {
+  border-top: 1px dashed var(--rova-line);
+  padding-top: 0.6rem;
+}
+
+.ghost-btn,
+.danger-btn {
+  padding: 0.35rem 0.85rem;
   border-radius: 999px;
+  font-size: var(--rova-fs-sm);
+  font-weight: var(--rova-fw-bold);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.delete-button {
-  border: 1px solid var(--rova-red-600);
+.ghost-btn {
+  border: 1.5px solid var(--rova-navy-900);
+  background: transparent;
+  color: var(--rova-navy-900);
+}
+
+.danger-btn {
+  border: 1.5px solid var(--rova-red-600);
   background: transparent;
   color: var(--rova-red-600);
-  border-radius: 999px;
-  padding: 0.35rem 0.8rem;
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 600;
 }
 </style>

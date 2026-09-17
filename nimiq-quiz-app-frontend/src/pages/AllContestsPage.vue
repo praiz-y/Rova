@@ -131,7 +131,7 @@ const hasAnyContests = computed(() => live.value.length + upcoming.value.length 
       <header class="page-header">
         <div>
           <p class="eyebrow">EXPLORE</p>
-          <h1>All Contests</h1>
+          <h1 class="rova-page-title">All Contests</h1>
           <p class="subtext">Find a contest to join, follow live results, or revisit completed competitions.</p>
         </div>
         <router-link to="/contests/new" class="create-btn">Create a Contest</router-link>
@@ -176,7 +176,7 @@ const hasAnyContests = computed(() => live.value.length + upcoming.value.length 
       </div>
 
       <div v-if="relevantLoading" class="grid">
-        <div v-for="n in 6" :key="n" class="skeleton-card" />
+        <div v-for="n in 6" :key="n" class="skeleton-card rova-skeleton" />
       </div>
 
       <div v-else-if="filteredItems.length === 0 && hasAnyFilter" class="empty-state">
@@ -220,15 +220,13 @@ const hasAnyContests = computed(() => live.value.length + upcoming.value.length 
 .eyebrow {
   margin: 0 0 0.3rem;
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: var(--rova-fw-bold);
   letter-spacing: 0.06em;
   color: var(--rova-red-600);
 }
 
 h1 {
   margin: 0 0 0.35rem;
-  font-size: 1.75rem;
-  color: var(--rova-navy-900);
 }
 
 .subtext {
@@ -353,22 +351,10 @@ h1 {
   gap: 1rem;
 }
 
+/* Geometry only. The gradient, background-size, border, radius and the
+   shimmer animation all come from .rova-skeleton in src/primitives.css. */
 .skeleton-card {
   height: 12rem;
-  border-radius: var(--rova-radius);
-  background: linear-gradient(90deg, var(--rova-surface) 25%, var(--rova-surface-alt) 50%, var(--rova-surface) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-  border: 1px solid var(--rova-line);
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
 }
 
 .empty-state {

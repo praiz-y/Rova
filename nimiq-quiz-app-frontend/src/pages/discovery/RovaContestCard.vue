@@ -145,7 +145,7 @@ const ctaPrimary = computed(() => props.variant === 'live' ? !!user.value : life
   border-radius: 999px;
   padding: 0.25rem 0.65rem;
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: var(--rova-fw-bold);
 }
 
 .prize-tag.free {
@@ -160,7 +160,7 @@ const ctaPrimary = computed(() => props.variant === 'live' ? !!user.value : life
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
   font-size: 0.62rem;
-  font-weight: 800;
+  font-weight: var(--rova-fw-bold);
   letter-spacing: 0.03em;
   background: var(--rova-surface-alt);
   color: var(--rova-ink-muted);

@@ -34,7 +34,7 @@ defineEmits<{ retry: [] }>()
     </div>
 
     <div v-if="loading" class="grid">
-      <div v-for="n in 3" :key="n" class="skeleton-card" />
+      <div v-for="n in 3" :key="n" class="skeleton-card rova-skeleton" />
     </div>
 
     <div v-else-if="error" class="error-state">
@@ -77,7 +77,7 @@ defineEmits<{ retry: [] }>()
   gap: 0.4rem;
   margin: 0 0 0.25rem;
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: var(--rova-fw-bold);
   letter-spacing: 0.06em;
   color: var(--rova-red-600);
 }
@@ -115,22 +115,10 @@ h2 {
   gap: 1rem;
 }
 
+/* Geometry only. The gradient, background-size, border, radius and the
+   shimmer animation all come from .rova-skeleton in src/primitives.css. */
 .skeleton-card {
   height: 12rem;
-  border-radius: var(--rova-radius);
-  background: linear-gradient(90deg, var(--rova-surface) 25%, var(--rova-surface-alt) 50%, var(--rova-surface) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-  border: 1px solid var(--rova-line);
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
 }
 
 .error-state {

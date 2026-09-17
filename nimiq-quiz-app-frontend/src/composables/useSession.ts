@@ -93,9 +93,29 @@ async function setUsername(username: string): Promise<void> {
   if (user.value) user.value.username = result.username
 }
 
+/**
+ * Advisory availability check for the Profile editor's live feedback.
+ * `setUsername` above is still the authority — someone can claim the name
+ * between this check and the save, and the server's 409 is what settles it.
+ */
+async function checkUsernameAvailable(username: string): Promise<boolean> {
+  const result = await apiFetch(
+    `/api/users/username-available?username=${encodeURIComponent(username)}`
+  )
+  return Boolean(result.available)
+}
+
 async function logout(): Promise<void> {
-  await apiFetch('/api/auth/logout', { method: 'POST' })
-  user.value = null
+  try {
+    await apiFetch('/api/auth/logout', { method: 'POST' })
+  } finally {
+    // Clear locally even if the server call fails. A user who clicks
+    // Disconnect is stating intent — leaving the header showing "connected"
+    // because the request 500'd is the silent-failure trap D030 exists to
+    // prevent. If the cookie genuinely survived, the next refresh() restores
+    // it, which is the honest outcome.
+    user.value = null
+  }
 }
 
 /**
@@ -120,6 +140,7 @@ export function useSession() {
     connect,
     refresh,
     setUsername,
+    checkUsernameAvailable,
     logout,
   }
 }

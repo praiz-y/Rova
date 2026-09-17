@@ -1,36 +1,38 @@
 <script setup lang="ts">
 /**
- * Shared shell for every ROVA-styled route (home, /contests, ...): the
- * token stylesheet, nav, footer, and mobile tab bar in one place so a new
- * ROVA page never has to re-import/re-wire any of it. See
- * CONTESTS_PAGE_PLAN.md Phase A.
+ * Shared shell for every ROVA-styled route (home, /contests, ...): the token
+ * stylesheet and the footer, so a new ROVA page never has to re-import or
+ * re-wire them. See CONTESTS_PAGE_PLAN.md Phase A.
+ *
+ * The header and the bottom tab bar deliberately do NOT live here — they are
+ * app-wide now (see App.vue). When they were route-scoped, navigation changed
+ * shape depending on where you were, and the tab bar existed on only two pages.
  */
 import './rova-tokens.css'
-import RovaNav from './RovaNav.vue'
 import RovaFooter from './RovaFooter.vue'
-import RovaBottomTabBar from './RovaBottomTabBar.vue'
 </script>
 
 <template>
   <div class="rova-page">
-    <RovaNav />
     <main>
       <slot />
     </main>
     <RovaFooter />
-    <RovaBottomTabBar />
   </div>
 </template>
 
 <style scoped>
+/* No min-height here: App.vue gives this element flex:1 inside the #app
+   column, so it already fills the viewport below the header. A 100vh
+   min-height would add the header's height on top and leave every ROVA page
+   with a strip of dead scroll. The bottom clearance for the fixed tab bar is
+   also applied there, so it can't be forgotten on a non-ROVA page. */
 .rova-page {
-  min-height: 100vh;
-  padding-bottom: 4.5rem;
+  display: flex;
+  flex-direction: column;
 }
 
-@media (min-width: 768px) {
-  .rova-page {
-    padding-bottom: 0;
-  }
+.rova-page main {
+  flex: 1;
 }
 </style>

@@ -3,7 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      interactive-widget=resizes-content — Chrome's default is resizes-visual,
+      which leaves the *layout* viewport at full height while its bottom
+      toolbar is showing, so a position:fixed;bottom:0 element lands behind
+      that toolbar. This asks the engine to shrink the layout viewport
+      instead. Engines that don't implement it ignore it — which is why the
+      mobile shell in src/style.css fixes the tab bar's position by layout
+      rather than relying on this alone.
+
+      viewport-fit=cover is deliberately NOT set. It would make
+      env(safe-area-inset-*) report real values, but this app runs inside
+      in-app browsers that already inset their own chrome, so the header got a
+      second round of top padding and rendered noticeably too tall on a phone.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"
+    />
+    <!-- Space Grotesk is self-hosted (see src/style.css). Preloading the two
+         weights that appear above the fold — 400 body, 700 wordmark/hero —
+         avoids a swap flash on first paint. `crossorigin` is required on font
+         preloads even same-origin, or the browser fetches the file twice. -->
+    <link
+      rel="preload"
+      href="/fonts/space-grotesk-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/space-grotesk-700.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <title>ROVA — Create. Compete. Win.</title>
   </head>
   <body>

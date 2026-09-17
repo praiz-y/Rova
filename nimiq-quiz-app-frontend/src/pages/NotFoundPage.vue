@@ -2,7 +2,7 @@
 <template>
   <main class="not-found">
     <p class="code">404</p>
-    <h1>Page not found</h1>
+    <h1 class="rova-page-title">Page not found</h1>
     <p class="lead">
       There's nothing at <code>{{ path }}</code>. It may have been moved, or the
       link may be out of date.
@@ -33,16 +33,13 @@ const path = computed(() => route.fullPath);
 }
 .code {
   font-size: 0.85rem;
-  font-weight: 900;
+  font-weight: var(--rova-fw-bold);
   letter-spacing: 0.12em;
   color: var(--rova-red-500);
   margin: 0 0 0.5rem;
 }
 .not-found h1 {
   margin: 0 0 0.75rem;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  color: var(--rova-navy-900);
 }
 .lead {
   color: var(--rova-ink-muted);

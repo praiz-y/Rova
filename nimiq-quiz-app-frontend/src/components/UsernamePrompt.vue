@@ -44,7 +44,7 @@ async function submit() {
 .prompt-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 27, 51, 0.45);
+  background: var(--rova-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -57,7 +57,7 @@ async function submit() {
   border-radius: var(--rova-radius);
   padding: 1.5rem;
   width: min(320px, 90vw);
-  box-shadow: 0 8px 32px rgba(15, 27, 51, 0.18);
+  box-shadow: var(--rova-shadow-overlay);
 }
 
 .prompt-card h2 {
