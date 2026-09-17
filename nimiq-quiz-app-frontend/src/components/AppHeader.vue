@@ -114,7 +114,13 @@ function shortAddress(address: string): string {
         <router-link to="/contests">Contests</router-link>
       </nav>
 
-      <router-link to="/" class="brand">ROVA</router-link>
+      <!-- The mark carries alt="" deliberately: the word "ROVA" sits right
+           beside it in the same link, so a label here would have screen
+           readers announce the brand twice. -->
+      <router-link to="/" class="brand">
+        <img src="/rova-mark.png" alt="" class="brand-mark" />
+        <span>ROVA</span>
+      </router-link>
 
       <div class="nav-right">
         <router-link to="/contests/new" class="create-link">
@@ -263,11 +269,25 @@ function shortAddress(address: string): string {
 
 .brand {
   justify-self: center;
+  /* inline-flex so the mark and the wordmark sit on one baseline; the grid
+     column above still centres the pair as a unit. */
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   font-size: 1.3rem;
   font-weight: var(--rova-fw-bold);
   letter-spacing: -0.02em;
   color: var(--rova-navy-900);
   text-decoration: none;
+}
+
+/* Sized in rem against the 1.3rem wordmark rather than fixed px, so the two
+   scale together if the wordmark ever changes. Slightly taller than the type
+   because the rings read small at cap height. */
+.brand-mark {
+  height: 1.55rem;
+  width: auto;
+  display: block;
 }
 
 .nav-right {

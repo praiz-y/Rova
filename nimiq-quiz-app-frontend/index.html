@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Cropped from Logo.jpg by make-logo-assets.ps1. PNG rather than the old
+         SVG because the real mark is raster; iOS needs its own entry point and
+         renders a transparent icon on black, so apple-touch-icon.png has the
+         app's cream composited behind it. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <!--
       interactive-widget=resizes-content — Chrome's default is resizes-visual,
       which leaves the *layout* viewport at full height while its bottom
