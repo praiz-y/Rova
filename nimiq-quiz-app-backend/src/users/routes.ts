@@ -22,6 +22,38 @@ usersRouter.get('/me', requireAuth, async (req, res) => {
   res.json(result.rows[0])
 })
 
+/**
+ * Live availability check behind the Profile username editor.
+ *
+ * D006 makes usernames case-insensitively unique (users_username_lower_idx),
+ * so this has to compare on lower(username) too — otherwise "Rova" would
+ * report free and the UPDATE would then 409.
+ *
+ * `id <> $2` lets a user keep their own name, including a case-only change
+ * ("variant01" -> "Variant01"), which would otherwise read as taken.
+ *
+ * Advisory only. The POST below remains the authority: a name can be claimed
+ * between this check and the save, and the unique index — not this query — is
+ * what settles that.
+ */
+usersRouter.get('/username-available', requireAuth, async (req, res) => {
+  const { userId } = (req as AuthenticatedRequest).session
+  const username = typeof req.query.username === 'string' ? req.query.username.trim() : ''
+
+  // A malformed candidate is not "available" — say so rather than 400, since
+  // the client calls this on every keystroke and a mid-word string is normal.
+  if (!username || !USERNAME_PATTERN.test(username)) {
+    res.json({ available: false })
+    return
+  }
+
+  const result = await pool.query(
+    'SELECT 1 FROM users WHERE lower(username) = lower($1) AND id <> $2',
+    [username, userId]
+  )
+  res.json({ available: result.rows.length === 0 })
+})
+
 usersRouter.post('/username', requireAuth, async (req, res) => {
   const { userId } = (req as AuthenticatedRequest).session
   const username = typeof req.body?.username === 'string' ? req.body.username.trim() : null

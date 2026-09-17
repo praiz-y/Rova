@@ -25,7 +25,7 @@ function sweepExpired(): void {
 export function createChallenge(): string {
   sweepExpired()
   const nonce = randomBytes(16).toString('hex')
-  const message = `Sign in to the Nimiq Quiz App\nNonce: ${nonce}`
+  const message = `Sign in to ROVA\nNonce: ${nonce}`
   challenges.set(message, Date.now() + CHALLENGE_TTL_MS)
   return message
 }

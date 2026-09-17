@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import type { Response } from 'express'
+import type { CookieOptions, Response } from 'express'
 
 const SESSION_COOKIE_NAME = 'session'
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30 // 30 days
@@ -17,12 +17,39 @@ function getSecret(): string {
   return secret
 }
 
+/**
+ * Shared cookie attributes for setting AND clearing the session cookie.
+ *
+ * `sameSite` is the load-bearing part. In deployment the frontend and this
+ * API live on different registrable domains — *.vercel.app and
+ * *.up.railway.app are both public suffixes — which makes them separate
+ * "sites". A SameSite=Lax cookie is never attached to a cross-site request,
+ * so every `credentials: 'include'` call would arrive unauthenticated: the
+ * user signs in successfully and is logged out again on the next request.
+ * 'none' is what lets the cookie travel at all.
+ *
+ * SameSite=None is only honoured together with Secure, and Secure requires
+ * HTTPS, so both switch on `NODE_ENV === 'production'` as a pair. Local dev
+ * keeps Lax over plain HTTP, where None would be rejected outright.
+ *
+ * Built by a function rather than inlined so `clearSession` cannot drift out
+ * of sync with these attributes — a mismatched clear silently leaves a live
+ * cookie behind on logout.
+ */
+function sessionCookieOptions(): CookieOptions {
+  const isProduction = process.env.NODE_ENV === 'production'
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/',
+  }
+}
+
 export function issueSession(res: Response, payload: SessionPayload): void {
   const token = jwt.sign(payload, getSecret(), { expiresIn: SESSION_TTL_SECONDS })
   res.cookie(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    ...sessionCookieOptions(),
     maxAge: SESSION_TTL_SECONDS * 1000,
   })
 }
@@ -36,7 +63,9 @@ export function verifySessionToken(token: string): SessionPayload | null {
 }
 
 export function clearSession(res: Response): void {
-  res.clearCookie(SESSION_COOKIE_NAME)
+  // Attributes must match issueSession's exactly, or the browser treats this
+  // as a different cookie and the session survives logout.
+  res.clearCookie(SESSION_COOKIE_NAME, sessionCookieOptions())
 }
 
 export { SESSION_COOKIE_NAME }

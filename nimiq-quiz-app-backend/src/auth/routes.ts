@@ -60,7 +60,12 @@ authRouter.post('/verify', async (req, res) => {
   const user = result.rows[0]
 
   issueSession(res, { userId: user.id, address: normalizedAddress })
-  res.json({ userId: user.id, address: normalizedAddress, username: user.username })
+  // This response body deserializes straight into the frontend's CurrentUser,
+  // whose field is `id` — and GET /api/users/me already returns `id`. The JWT
+  // payload on the line above keeps `userId`: that's session.ts's
+  // SessionPayload, a separate contract. Mismatching these made `user.id`
+  // undefined immediately after connecting and correct after any reload.
+  res.json({ id: user.id, address: normalizedAddress, username: user.username })
 })
 
 authRouter.post('/logout', (_req, res) => {

@@ -12,9 +12,25 @@ import { startLifecycleTicker } from './contests/lifecycle.js'
 const app = express()
 
 
+const DEFAULT_FRONTEND_ORIGIN = 'http://localhost:5176'
+
+/**
+ * CORS allowlist. Comma-separated so the deployed frontend and a local dev
+ * server can both be accepted at once:
+ *   FRONTEND_ORIGIN=https://your-app.vercel.app,http://localhost:5176
+ *
+ * Trailing slashes are stripped because a browser's Origin header never
+ * carries one — "https://your-app.vercel.app/" would never match, and the
+ * resulting CORS failure points nowhere useful.
+ */
+const ALLOWED_ORIGINS = (process.env.FRONTEND_ORIGIN?.trim() || DEFAULT_FRONTEND_ORIGIN)
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:5176',
+    origin: ALLOWED_ORIGINS.length > 0 ? ALLOWED_ORIGINS : [DEFAULT_FRONTEND_ORIGIN],
     credentials: true,
   })
 )

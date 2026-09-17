@@ -122,25 +122,44 @@ export interface FundingMatch {
 }
 
 export interface FundingCheckResult {
-  /** A finalized transaction that fully covers the required total. */
+  /**
+   * The finalized deposits whose values together cover the required total.
+   * `amountNim` is the cumulative sum, not any single transfer — see the
+   * summing note in `checkFundingTransactions`.
+   */
   match: FundingMatch | null
   /**
-   * A finalized transaction that matches this contest's reference but
-   * falls short of the required total (D021/D022-adjacent: Phase 5's
-   * "underfunded deposit must be clearly reported, not silently treated
-   * as funded or silently stuck forever"). If multiple partial sends
-   * exist, the largest is reported. Only meaningful when `match` is null.
+   * The same cumulative total, when it falls short of the required total
+   * (D021/D022-adjacent: Phase 5's "underfunded deposit must be clearly
+   * reported, not silently treated as funded or silently stuck forever").
+   * Reporting the SUM rather than the largest single transfer is what makes
+   * the route's "send the remaining X NIM" instruction converge: every
+   * additional deposit shrinks the remainder instead of resetting it. Only
+   * meaningful when `match` is null.
    */
   underfunded: FundingMatch | null
 }
 
 /**
- * Looks for a finalized incoming transaction to `depositAddress` whose data
+ * Looks for finalized incoming transactions to `depositAddress` whose data
  * matches this contest's reference. Distinguishes "no matching deposit
  * found yet" from "a matching deposit arrived but it's short" — the two
  * previously looked identical (both just "pending" forever), which is a
  * real trap for a sponsor who sent the wrong amount and would otherwise
  * see no explanation at all.
+ *
+ * Matching is CUMULATIVE, not per-transaction. The underfunded response
+ * tells the sponsor to "send the remaining X NIM to the same deposit
+ * address with the same reference", and a remainder is by definition less
+ * than the required total — so testing each transaction's value against the
+ * full total on its own could never match that follow-up. A part-paid
+ * contest stayed 'underfunded' forever, publish kept returning 400, and
+ * every NIM the sponsor had already sent was stranded. Summing is what
+ * makes that instruction converge.
+ *
+ * Caveat: the sum is only as complete as the lookup window in nimiqRpc.ts
+ * (the newest N transactions for the address, N defaulting to 30), so a
+ * deposit old enough to fall outside that window still reads as short.
  */
 export async function checkFundingTransactions(
   contest: Contest,
@@ -154,7 +173,8 @@ export async function checkFundingTransactions(
 
   const transactions = await getIncomingTransactions(depositAddress)
 
-  let underfunded: FundingMatch | null = null
+  let totalLuna = 0n
+  let largest: { txHash: string; blockNumber: number; value: bigint } | null = null
 
   for (const tx of transactions) {
     if (decodeHexData(tx.recipientData) !== reference) continue
@@ -163,15 +183,25 @@ export async function checkFundingTransactions(
     if (!finalized) continue
 
     const value = BigInt(tx.value)
-    const candidate: FundingMatch = { txHash: tx.hash, amountNim: lunaToNim(value), blockNumber: tx.blockNumber }
-
-    if (value >= requiredLuna) {
-      return { match: candidate, underfunded: null }
-    }
-    if (!underfunded || value > nimToLuna(underfunded.amountNim)) {
-      underfunded = candidate
+    totalLuna += value
+    // Tracked only so a single hash can be recorded — see below.
+    if (!largest || value > largest.value) {
+      largest = { txHash: tx.hash, blockNumber: tx.blockNumber, value }
     }
   }
 
-  return { match: null, underfunded }
+  if (!largest) return { match: null, underfunded: null }
+
+  // `amountNim` is the running total across every matching deposit, but the
+  // DB has a single `funding_tx_hash` column, so `txHash` can only name one
+  // of them — the largest. For the common single-deposit case the two agree.
+  const funding: FundingMatch = {
+    txHash: largest.txHash,
+    amountNim: lunaToNim(totalLuna),
+    blockNumber: largest.blockNumber,
+  }
+
+  return totalLuna >= requiredLuna
+    ? { match: funding, underfunded: null }
+    : { match: null, underfunded: funding }
 }

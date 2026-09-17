@@ -245,7 +245,48 @@ async function main() {
   const publishUnderfunded = await api(cookieA, `/api/contests/${underfundedContest.body.id}/publish`, { method: 'POST' })
   assert(publishUnderfunded.status === 400, 'an underfunded contest still cannot publish (400) — never silently treated as funded')
 
-  console.log('\nAll funding/publish/cancel checks passed, including a real detected deposit, a real underfunded deposit, and real publish-gate enforcement.')
+  // --- The top-up path. The underfunded message told the sponsor to "send
+  // the remaining X NIM to the same deposit address with the same
+  // reference". Before deposits were summed, that follow-up could never
+  // satisfy the check — every transfer was compared against the full total
+  // on its own — so the contest stayed underfunded forever and the money
+  // already sent was stranded. Cover the second deposit now.
+  const requiredLuna = BigInt(Math.round(Number(totalNim) * 100_000))
+  const remainderLuna = requiredLuna - shortLuna
+  const topUpHeight = await getCurrentBlockNumber()
+  const signedTopUp = buildAndSignTransaction({
+    privateKeyHex: funderPrivateKey,
+    recipientAddress: depositAddress,
+    valueLuna: remainderLuna,
+    data: reference,
+    validityStartHeight: topUpHeight,
+  })
+  const topUpTxHash = await broadcastRawTransaction(signedTopUp.hex)
+  console.log(`Broadcast top-up deposit tx (${shortLuna} + ${remainderLuna} = ${requiredLuna} luna):`, topUpTxHash)
+
+  let sawConfirmed = false
+  let lastConfirmedCheck: any = null
+  for (let attempt = 0; attempt < 20; attempt++) {
+    lastConfirmedCheck = await api(cookieA, `/api/contests/${underfundedContest.body.id}/funding/check`, { method: 'POST' })
+    if (lastConfirmedCheck.body?.fundingStatus === 'confirmed') {
+      sawConfirmed = true
+      break
+    }
+    await delay(8000)
+  }
+  assert(
+    sawConfirmed,
+    `two deposits that together cover the total confirm the contest — last: ${JSON.stringify(lastConfirmedCheck?.body)}`
+  )
+  assert(
+    lastConfirmedCheck.body.fundedAmountNim === totalNim,
+    `funded_amount_nim records the summed total (${totalNim}), got ${lastConfirmedCheck.body.fundedAmountNim}`
+  )
+
+  const publishFunded = await api(cookieA, `/api/contests/${underfundedContest.body.id}/publish`, { method: 'POST' })
+  assert(publishFunded.status === 200, 'a contest funded by two separate deposits can publish (200)')
+
+  console.log('\nAll funding/publish/cancel checks passed, including a real detected deposit, a real underfunded deposit, a real top-up that completes it, and real publish-gate enforcement.')
 }
 
 main().catch((err) => {
