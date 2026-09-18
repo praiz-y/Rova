@@ -48,6 +48,7 @@
 import { ref, readonly, type Ref } from 'vue'
 import { init, type NimiqProvider } from '@nimiq/mini-app-sdk'
 import HubApi from '@nimiq/hub-api'
+import { authHeaders } from './sessionToken'
 
 const NIMIQ_INIT_TIMEOUT = 10_000
 const HUB_URL = import.meta.env.VITE_NIMIQ_HUB_URL ?? 'https://hub.nimiq-testnet.com'
@@ -187,7 +188,7 @@ function buildHubAdapter(): WalletAdapter {
         const res = await fetch(`${API_BASE}/api/blockchain/broadcast`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ hex: signed.serializedTx }),
         })
         const body = await res.json().catch(() => ({}))

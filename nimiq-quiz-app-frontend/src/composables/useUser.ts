@@ -1,6 +1,7 @@
 // src/composables/useUser.ts
 import { ref } from 'vue';
 import type { Ref } from 'vue';
+import { authHeaders } from './sessionToken';
 
 export interface UserHistory {
   registrations: any[];
@@ -29,6 +30,7 @@ export function useUserHistory(userId: string) {
       const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
       const resp = await window.fetch(`${apiBase}/api/users/${userId}/history`, {
         credentials: 'include',
+        headers: authHeaders(),
       });
       if (!resp.ok) throw new Error(`Failed ${resp.status}`);
       data.value = await resp.json();
@@ -57,6 +59,7 @@ export function useSponsoredContests(userId: string) {
       const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
       const resp = await window.fetch(`${apiBase}/api/users/${userId}/sponsored`, {
         credentials: 'include',
+        headers: authHeaders(),
       });
       if (!resp.ok) throw new Error(`Failed ${resp.status}`);
       contests.value = await resp.json();

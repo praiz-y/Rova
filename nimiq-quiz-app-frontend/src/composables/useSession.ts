@@ -8,6 +8,7 @@
  */
 import { ref, readonly } from 'vue'
 import { useProviders } from './useProviders'
+import { authHeaders, clearSessionToken, setSessionToken } from './sessionToken'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -25,7 +26,7 @@ async function apiFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...init?.headers },
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -68,7 +69,13 @@ async function connect(): Promise<void> {
         signature: signed.signature,
       }),
     })
-    user.value = result
+    // The body carries the same JWT the server just set as a cookie. Storing
+    // it is what carries the session through the Nimiq Pay webview, which
+    // refuses the cross-site cookie — see sessionToken.ts. It is kept out of
+    // `user` on purpose: that ref is shared app-wide through readonly(), and a
+    // credential does not belong in state that components render.
+    setSessionToken(result.token)
+    user.value = { id: result.id, address: result.address, username: result.username }
   } catch (err: any) {
     error.value = err?.message ?? 'Failed to connect wallet'
     throw err
@@ -112,8 +119,10 @@ async function logout(): Promise<void> {
     // Clear locally even if the server call fails. A user who clicks
     // Disconnect is stating intent — leaving the header showing "connected"
     // because the request 500'd is the silent-failure trap D030 exists to
-    // prevent. If the cookie genuinely survived, the next refresh() restores
-    // it, which is the honest outcome.
+    // prevent. If the session genuinely survived, the next refresh() restores
+    // it, which is the honest outcome. The stored token has to go as well, or
+    // the next request would quietly reconnect a user who just disconnected.
+    clearSessionToken()
     user.value = null
   }
 }
@@ -128,6 +137,9 @@ async function logout(): Promise<void> {
  * "Connect Wallet", and `error` carries a clear, actionable message.
  */
 function invalidateSession(message = 'Your session expired. Reconnect your wallet to continue.'): void {
+  // Drop the stored token too, or the requests that follow this 401 would keep
+  // replaying the same dead credential.
+  clearSessionToken()
   user.value = null
   error.value = message
 }

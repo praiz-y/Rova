@@ -46,12 +46,28 @@ function sessionCookieOptions(): CookieOptions {
   }
 }
 
-export function issueSession(res: Response, payload: SessionPayload): void {
-  const token = jwt.sign(payload, getSecret(), { expiresIn: SESSION_TTL_SECONDS })
+/**
+ * Signs a session token. Split out of `issueSession` because the token now
+ * travels by two routes — the cookie set there, and the `Authorization:
+ * Bearer` header the frontend falls back to. requireAuth.ts explains why the
+ * cookie cannot be the only carrier.
+ */
+export function signSessionToken(payload: SessionPayload): string {
+  return jwt.sign(payload, getSecret(), { expiresIn: SESSION_TTL_SECONDS })
+}
+
+/**
+ * Sets the session cookie and returns the same token, so the caller can put it
+ * in the response body as well. Returns rather than returns-void because
+ * /api/auth/verify sends both and signing twice would be two different tokens.
+ */
+export function issueSession(res: Response, payload: SessionPayload): string {
+  const token = signSessionToken(payload)
   res.cookie(SESSION_COOKIE_NAME, token, {
     ...sessionCookieOptions(),
     maxAge: SESSION_TTL_SECONDS * 1000,
   })
+  return token
 }
 
 export function verifySessionToken(token: string): SessionPayload | null {

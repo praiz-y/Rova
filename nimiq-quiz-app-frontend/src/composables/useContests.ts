@@ -4,6 +4,7 @@
  * tested end-to-end in contests/e2e.manualtest.ts.
  */
 import { invalidateSession } from './useSession'
+import { authHeaders } from './sessionToken'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -152,7 +153,7 @@ async function apiFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...init?.headers },
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))

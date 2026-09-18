@@ -59,13 +59,18 @@ authRouter.post('/verify', async (req, res) => {
   )
   const user = result.rows[0]
 
-  issueSession(res, { userId: user.id, address: normalizedAddress })
+  // The token goes into the body as well as into the cookie. The frontend
+  // keeps the body copy and replays it as `Authorization: Bearer`, which is
+  // what carries the session through an in-app webview that refuses the
+  // cross-site cookie — see requireAuth.ts. Same token in both places, which
+  // is why issueSession returns it rather than signing a second one.
+  const token = issueSession(res, { userId: user.id, address: normalizedAddress })
   // This response body deserializes straight into the frontend's CurrentUser,
   // whose field is `id` — and GET /api/users/me already returns `id`. The JWT
   // payload on the line above keeps `userId`: that's session.ts's
   // SessionPayload, a separate contract. Mismatching these made `user.id`
   // undefined immediately after connecting and correct after any reload.
-  res.json({ id: user.id, address: normalizedAddress, username: user.username })
+  res.json({ id: user.id, address: normalizedAddress, username: user.username, token })
 })
 
 authRouter.post('/logout', (_req, res) => {
